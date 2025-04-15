@@ -8,7 +8,7 @@ const app = express();
 
 // Middleware
 const allowedOrigins = [
-  'https://fam-frontend-bby4.onrender.com' // Allow frontend origin
+  'https://fam-sports.onrender.com' // Allow frontend origin
 ];
 
 const corsOptions = {
