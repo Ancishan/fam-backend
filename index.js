@@ -8,7 +8,8 @@ const app = express();
 
 // Middleware
 const allowedOrigins = [
-  'https://fam-sports.onrender.com' // Allow frontend origin
+  // 'https://fam-sports.onrender.com' // Allow frontend origin
+  'http://localhost:3000'
 ];
 
 const corsOptions = {
@@ -33,167 +34,156 @@ mongoose.connect(process.env.MONGODB_URI, {
 .then(() => console.log('✅ Connected to MongoDB'))
 .catch(err => console.error('❌ MongoDB connection error:', err));
 
-// User Schema
-const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  photo: { type: String, required: true },
-  phone: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  role: { type: String, enum: ['user', 'admin'], default: 'user' },
-  createdAt: { type: Date, default: Date.now }
-});
-
+// In your server.js file, update the product schema:
+// Product Schema
 // Product Schema
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   model: { type: String, required: true },
   price: { type: Number, required: true },
+  discount: { type: Number, default: 0 },
   image: { type: String, required: true },
   description: { type: String, required: true },
+  category: {
+    type: String,
+    required: true,
+    enum: ["sports", "retro", "home-kit", "player-edition"] // Updated category values
+  },
   createdAt: { type: Date, default: Date.now }
 });
 
+
 const Product = mongoose.model('Product', productSchema);
 
-
-
-const User = mongoose.model('User', userSchema);
-
-// Registration Endpoint
-app.post('/api/auth/register', async (req, res) => {
+// Add Product
+app.post('/products', async (req, res) => {
   try {
-    console.log('📥 Received data:', req.body);
+    const { name, model, price, description, discount, image, category } = req.body;
 
-    const { name, photo, phone, email, password, role } = req.body;
-
-    if (!name || !photo || !phone || !email || !password) {
-      return res.status(400).json({ message: 'All fields are required' });
+    if (!name || !model || !price || !description || !image || !category) {
+      return res.status(400).json({ error: 'All fields are required' });
     }
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' });
-    }
-
-    // Create new user
-    const newUser = new User({
+    const newProduct = new Product({
       name,
-      photo,
-      phone,
-      email,
-      password, // Note: Use bcrypt to hash this in production
-      role: role || 'user'
+      model,
+      price: parseFloat(price),
+      discount: discount ? parseFloat(discount) : 0,
+      description,
+      image,
+      category,
     });
 
-    await newUser.save();
-
-    res.status(201).json({
-      message: 'User registered successfully',
-      user: {
-        id: newUser._id,
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
-        photo: newUser.photo
-      }
-    });
+    const savedProduct = await newProduct.save();
+    res.status(201).json(savedProduct);
   } catch (error) {
-    console.error('❌ Registration error:', error);
-    res.status(500).json({ message: 'Server error during registration' });
+    console.error('Error creating product:', error);
+    res.status(500).json({ error: 'Server error while creating product' });
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
-    try {
-      const { email, password } = req.body;
-  
-      // Check for required fields
-      if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required' });
-      }
-  
-      // Find user by email
-      const user = await User.findOne({ email });
-  
-      if (!user) {
-        return res.status(401).json({ message: 'User not found' });
-      }
-  
-      // NOTE: You should hash passwords — for demo, we compare plain text
-      if (user.password !== password) {
-        return res.status(401).json({ message: 'Incorrect password' });
-      }
-  
-      // Success
-      res.status(200).json({
-        message: 'Login successful',
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          photo: user.photo,
-        },
-      });
-    } catch (error) {
-      console.error('Login error:', error);
-      res.status(500).json({ message: 'Server error during login' });
+// Get all products or filtered by category
+app.get("/products", async (req, res) => {
+  try {
+    const { category } = req.query;
+    let query = {};
+    
+    if (category) {
+      query.category = category;
     }
-  });
+
+    const products = await Product.find(query).sort({ createdAt: -1 });
+    res.status(200).json(products);
+  } catch (err) {
+    console.error("Error fetching products:", err);
+    res.status(500).json({ error: "Failed to fetch products" });
+  }
+});
+
+// Get single product
+app.get("/products/:id", async (req, res) => {
+  const { id } = req.params;
   
-  
-// Add to your server.js
-app.get('/api/auth/check', async (req, res) => {
-    try {
-      // In a real app, you would check the session or JWT token
-      // For demo, we'll just return the first user (remove this in production)
-      const user = await User.findOne();
-      if (!user) {
-        return res.status(401).json({ message: 'Not authenticated' });
-      }
-      
-      res.json({
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        photo: user.photo,
-        role: user.role
+  try {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Invalid product ID format"
       });
-    } catch (error) {
-      console.error('Auth check error:', error);
-      res.status(500).json({ message: 'Server error' });
     }
-  });
-  
-  app.post('/api/auth/logout', (req, res) => {
-    // In a real app, you would clear the session or JWT token
-    res.json({ message: 'Logged out successfully' });
-  });
+    
+    const product = await Product.findById(id);
+    
+    if (!product) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Product not found"
+      });
+    }
+    
+    res.json({
+      success: true,
+      product
+    });
+    
+  } catch (err) {
+    console.error("Error fetching product:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error"
+    });
+  }
+});
 
 
-  app.post("/products", async (req, res) => {
-    try {
-      const newProduct = new Product(req.body); // Assuming Product model is defined
-      await newProduct.save();
-      res.status(201).json({ message: "Product saved!", product: newProduct });
-    } catch (err) {
-      res.status(500).json({ error: "Failed to save product" });
-    }
-  });
+// // Add Product
+// app.post('/products', async (req, res) => {
+//   try {
+//     const { name, model, price, description, image, category } = req.body;
+
+//     if (!name || !model || !price || !description || !image || !category) {
+//       return res.status(400).json({ error: 'All fields are required' });
+//     }
+
+//     const newProduct = new Product({
+//       name,
+//       model,
+//       price: parseFloat(price),
+//       description,
+//       image,
+//       category,
+//     });
+
+//     const savedProduct = await newProduct.save();
+//     res.status(201).json(savedProduct);
+//   } catch (error) {
+//     console.error('Error creating product:', error);
+//     res.status(500).json({ error: 'Server error while creating product' });
+//   }
+// });
   
-  app.get("/products", async (req, res) => {
-    console.log("Received request for products");
-    try {
-      const products = await Product.find(); // Fetch all products from DB
-      res.status(200).json(products);
-    } catch (err) {
-      console.error("Error fetching products:", err);
-      res.status(500).json({ error: "Failed to fetch products" });
-    }
-  });
+//   // In your server.js file
+// app.get("/products", async (req, res) => {
+//   console.log("Received request for products");
+//   try {
+//     const { category } = req.query;
+//     let query = {};
+    
+//     if (category) {
+//       query.category = category;
+//     }
+
+//     const products = await Product.find(query); // Fetch filtered products
+//     res.status(200).json(products);
+//   } catch (err) {
+//     console.error("Error fetching products:", err);
+//     res.status(500).json({ error: "Failed to fetch products" });
+//   }
+// });
   
+
+
+
 // Update a product - PUT /api/products/:id
 app.put('/api/products/:id', async (req, res) => {
   try {
