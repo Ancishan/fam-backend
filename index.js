@@ -8,8 +8,8 @@ const app = express();
 
 // Middleware
 const allowedOrigins = [
-  // 'https://fam-sports.onrender.com' // Allow frontend origin
-  'http://localhost:3000'
+  'https://fam-sports.onrender.com' // Allow frontend origin
+  // 'http://localhost:3000'
 ];
 
 const corsOptions = {
