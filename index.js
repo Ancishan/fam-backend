@@ -8,8 +8,8 @@ const app = express();
 
 // Middleware
 const allowedOrigins = [
-  'http://localhost:3000',
-  // 'https://fam-sports.vercel.app'
+  // 'http://localhost:3000',
+  'https://fam-sports.vercel.app'
 ];
 
 const corsOptions = {
@@ -84,6 +84,14 @@ const comboProductSchema = new mongoose.Schema({
 });
 
 const ComboProduct = mongoose.model('ComboProduct', comboProductSchema);
+
+const bannerSchema = new mongoose.Schema({
+  image: { type: String, required: true }, // Store image URL
+  caption: { type: String, required: true }, // Store caption
+});
+
+const Banner = mongoose.model("Banner", bannerSchema);
+
 
 // Create a Product
 app.post('/products', async (req, res) => {
@@ -298,6 +306,135 @@ app.get("/combos/:id", async (req, res) => {
     });
   }
 });
+
+// GET all combo products
+app.get("/combo", async (req, res) => {
+  const products = await Combo.find();
+  res.json(products);
+});
+
+// get single Combo PRoduct
+app.get("/combo/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const product = await ComboProduct.findById(id);
+    if (!product) {
+      return res.status(404).send("Combo product not found");
+    }
+    res.json(product);
+  } catch (error) {
+    res.status(500).send("Server error");
+  }
+});
+
+// delete Combo PRoduct
+app.delete("/combo/:id", async (req, res) => {
+  const { id } = req.params;
+  console.log("Deleting combo product with ID:", id); // Add this line to log the ID
+
+  try {
+    const product = await ComboProduct.findByIdAndDelete(id);
+    if (!product) {
+      return res.status(404).send({ message: "Product not found" });
+    }
+    res.send({ message: "Deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting product:", error);
+    res.status(500).send({ message: "Error deleting product" });
+  }
+});
+
+
+// Update a combo product by ID
+app.put("/combo/:id", async (req, res) => {
+  const { id } = req.params;
+  const updatedData = req.body;
+
+  try {
+    const updatedProduct = await ComboProduct.findByIdAndUpdate(id, updatedData, {
+      new: true,
+    });
+
+    if (!updatedProduct) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    res.status(200).json(updatedProduct);
+  } catch (err) {
+    console.error("Update failed:", err);
+    res.status(500).json({ message: "Failed to update product" });
+  }
+});
+
+
+// Banner Part 
+app.post("/banner", async (req, res) => {
+  const { image, caption } = req.body;
+
+  try {
+    const newBanner = new Banner({
+      image,
+      caption,
+    });
+
+    await newBanner.save();
+    res.status(201).send({ message: "Banner added successfully!" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: "Failed to add banner" });
+  }
+});
+
+// get all banner.js (add this part)
+app.get("/banner", async (req, res) => {
+  try {
+    const banners = await Banner.find();
+    res.status(200).json(banners);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: "Failed to fetch banners" });
+  }
+});
+
+// Fetch a single banner by ID
+app.get("/banner/:id", async (req, res) => {
+  try {
+    const banner = await Banner.findById(req.params.id);
+    if (!banner) {
+      return res.status(404).json({ message: "Banner not found" });
+    }
+    res.json(banner);
+  } catch (err) {
+    console.error("Error fetching banner:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// DELETE banner
+app.delete("/banner/:id", async (req, res) => {
+  try {
+    await Banner.findByIdAndDelete(req.params.id);
+    res.json({ message: "Banner deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: "Deletion failed" });
+  }
+});
+
+
+app.put("/banner/:id", async (req, res) => {
+  const { image, caption } = req.body;
+  try {
+    const updated = await Banner.findByIdAndUpdate(
+      req.params.id,
+      { image, caption },
+      { new: true }
+    );
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: "Update failed" });
+  }
+});
+
 
 
 // Basic test endpoint
