@@ -8,9 +8,27 @@ const app = express();
 
 // Middleware
 const allowedOrigins = [
-  // 'http://localhost:3000',
-  'https://fam-sports.vercel.app'
+  'http://localhost:3000',
+  // 'https://fam-sports.vercel.app'
 ];
+
+// adminAuth.js (middleware)
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD; 
+
+const adminAuth = (req, res, next) => {
+  const { username, password } = req.body;
+
+  if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+    next(); // allow access
+  } else {
+    res.status(401).json({ message: "Unauthorized" });
+  }
+};
+
+module.exports = adminAuth;
+
+
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -92,6 +110,17 @@ const bannerSchema = new mongoose.Schema({
 
 const Banner = mongoose.model("Banner", bannerSchema);
 
+// Admin Login (returns a token or just success)
+app.post("/admin-login", (req, res) => {
+  const { username, password } = req.body;
+
+  if (username === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASSWORD) {
+    // optionally you can return a token
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ message: "Please check ur user name and password" });
+  }
+});
 
 // Create a Product
 app.post('/products', async (req, res) => {
