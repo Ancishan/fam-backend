@@ -9,26 +9,8 @@ const app = express();
 // Middleware
 const allowedOrigins = [
   'http://localhost:3000',
-  // 'https://fam-sports.vercel.app'
+  // 'https://dk-gadget-hub.vercel.app'
 ];
-
-// adminAuth.js (middleware)
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD; 
-
-const adminAuth = (req, res, next) => {
-  const { username, password } = req.body;
-
-  if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-    next(); // allow access
-  } else {
-    res.status(401).json({ message: "Unauthorized" });
-  }
-};
-
-module.exports = adminAuth;
-
-
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -69,6 +51,31 @@ const productSchema = new mongoose.Schema({
 });
 
 const Product = mongoose.model('Product', productSchema);
+
+// Order Schema
+// models/order.model.js
+const orderSchema = new mongoose.Schema(
+  {
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
+    productName: String,
+    quantity: Number,
+    totalPrice: Number,
+    buyerName: String,
+    buyerEmail: String,
+    phone: String,
+    address: String,
+    status: {
+      type: String,
+      enum: ["pending", "processing", "shipped", "delivered", "cancelled"],
+      default: "pending",
+    },
+    transactionId: { type: String, default: null },
+  },
+  { timestamps: true }
+);
+
+const Order = mongoose.model("Order", orderSchema);
+
 
 const comboProductSchema = new mongoose.Schema({
   name: {
@@ -111,14 +118,14 @@ const bannerSchema = new mongoose.Schema({
 const Banner = mongoose.model("Banner", bannerSchema);
 
 // Admin Login (returns a token or just success)
-app.post("/admin-login", (req, res) => {
+app.post("/admin", (req, res) => {
   const { username, password } = req.body;
 
   if (username === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASSWORD) {
     // optionally you can return a token
     res.json({ success: true });
   } else {
-    res.status(401).json({ message: "Please check ur user name and password" });
+    res.status(401).json({ message: "invalid credential" });
   }
 });
 
@@ -463,6 +470,137 @@ app.put("/banner/:id", async (req, res) => {
     res.status(500).json({ error: "Update failed" });
   }
 });
+
+
+
+app.post("/order", async (req, res) => {
+  try {
+    const {
+      productId,
+      productName,
+      quantity,
+      totalPrice,
+      buyerName,
+      buyerEmail,  // ডিবাগের জন্য লগ করবো
+      phone,
+      address,
+    } = req.body;
+
+    console.log("Received order data:", req.body);  // <=== এইটা লগ করে দেখবে কি আসছে
+
+    if (
+      !productId ||
+      !productName ||
+      !quantity ||
+      !totalPrice ||
+      !buyerName ||
+      !buyerEmail ||  // buyerEmail চেক করো
+      !phone ||
+      !address
+    ) {
+      return res.status(400).json({ success: false, message: "All fields are required" });
+    }
+
+    // নতুন order obj তৈরি
+    const newOrder = new Order({
+      productId,
+      productName,
+      quantity,
+      totalPrice,
+      buyerName,
+      buyerEmail,   // এটা একদম ঠিক মতো লাগবে
+      phone,
+      address,
+    });
+
+    const savedOrder = await newOrder.save();
+
+    console.log("Order saved:", savedOrder);  // <=== সেভ হওয়ার পরে লগ করো
+
+    res.status(201).json({
+      success: true,
+      message: "Order placed successfully",
+      order: savedOrder,
+    });
+  } catch (error) {
+    console.error("❌ Error placing order:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while placing order",
+      error: error.message,
+    });
+  }
+});
+
+
+
+// Admin: Get all orders (for dashboard)
+app.get("/orders", async (req, res) => {
+  try {
+    const orders = await Order.find().sort({ createdAt: -1 });
+    res.json({ success: true, orders });
+  } catch (error) {
+    console.error("❌ Failed to fetch orders:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch orders" });
+  }
+});
+
+// PATCH /orders/:id
+
+app.patch("/orders/:id", async (req, res) => {
+  const { id } = req.params;
+  const { status, transactionId } = req.body;
+
+  const updateFields = {};
+  if (status) updateFields.status = status;
+  if (transactionId) updateFields.transactionId = transactionId;
+
+  try {
+    const result = await Order.findByIdAndUpdate(id, updateFields, { new: true });
+    res.send({ success: true, order: result });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ success: false, message: "Failed to update order" });
+  }
+});
+
+
+
+// ✅ Get orders by user email (for "My Orders" page)
+app.get("/my-orders", async (req, res) => {
+  const { email } = req.query;
+
+  try {
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const orders = await Order.find({ buyerEmail: email }).sort({ createdAt: -1 });
+
+    if (!orders.length) {
+      return res.status(404).json({
+        success: false,
+        message: "No orders found for this user",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      orders,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching my-orders:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching orders",
+    });
+  }
+});
+
+
 
 
 
