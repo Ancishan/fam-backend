@@ -70,6 +70,11 @@ const orderSchema = new mongoose.Schema(
       default: "pending",
     },
     transactionId: { type: String, default: null },
+      orderedBy: {
+      type: String,
+      enum: ["website", "bkash"],
+      default: "website",
+    },
   },
   { timestamps: true }
 );
@@ -483,6 +488,7 @@ app.post("/order", async (req, res) => {
       buyerName,
       buyerEmail,  // ডিবাগের জন্য লগ করবো
       phone,
+      orderedBy,
       address,
     } = req.body;
 
@@ -510,6 +516,7 @@ app.post("/order", async (req, res) => {
       buyerName,
       buyerEmail,   // এটা একদম ঠিক মতো লাগবে
       phone,
+      orderedBy,
       address,
     });
 
