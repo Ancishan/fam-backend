@@ -1,3 +1,4 @@
+// --- server.js (or app.js) ---
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -408,7 +409,7 @@ app.put("/combo/:id", async (req, res) => {
 });
 
 
-// Banner Part 
+// Banner Part
 app.post("/banner", async (req, res) => {
   const { image, caption } = req.body;
 
@@ -486,13 +487,13 @@ app.post("/order", async (req, res) => {
       quantity,
       totalPrice,
       buyerName,
-      buyerEmail,  // ডিবাগের জন্য লগ করবো
+      buyerEmail,   // ডিবাগের জন্য লগ করবো
       phone,
       orderedBy,
       address,
     } = req.body;
 
-    console.log("Received order data:", req.body);  // <=== এইটা লগ করে দেখবে কি আসছে
+    console.log("Received order data:", req.body);   // <=== এইটা লগ করে দেখবে কি আসছে
 
     if (
       !productId ||
@@ -500,7 +501,7 @@ app.post("/order", async (req, res) => {
       !quantity ||
       !totalPrice ||
       !buyerName ||
-      !buyerEmail ||  // buyerEmail চেক করো
+      !buyerEmail ||   // buyerEmail চেক করো
       !phone ||
       !address
     ) {
@@ -514,7 +515,7 @@ app.post("/order", async (req, res) => {
       quantity,
       totalPrice,
       buyerName,
-      buyerEmail,   // এটা একদম ঠিক মতো লাগবে
+      buyerEmail,    // এটা একদম ঠিক মতো লাগবে
       phone,
       orderedBy,
       address,
@@ -522,7 +523,7 @@ app.post("/order", async (req, res) => {
 
     const savedOrder = await newOrder.save();
 
-    console.log("Order saved:", savedOrder);  // <=== সেভ হওয়ার পরে লগ করো
+    console.log("Order saved:", savedOrder);   // <=== সেভ হওয়ার পরে লগ করো
 
     res.status(201).json({
       success: true,
@@ -604,6 +605,32 @@ app.get("/my-orders", async (req, res) => {
       success: false,
       message: "Server error fetching orders",
     });
+  }
+});
+
+// 🔍 Search products by name
+// GET /search?q=searchTerm
+app.get('/search', async (req, res) => {
+  const { q } = req.query;
+
+  if (!q || q.trim() === '') {
+    return res.status(400).json({ message: 'Search query is required' });
+  }
+
+  try {
+    // Escape special characters to prevent regex issues
+    const escapedQuery = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escapedQuery, 'i'); // 'i' = case-insensitive
+
+    // Find products matching the regex on either 'name' or 'model' fields
+    const products = await Product.find({
+      $or: [{ name: regex }, { model: regex }],
+    }).sort({ createdAt: -1 });
+
+    res.json(products);
+  } catch (error) {
+    console.error('Search error:', error);
+    res.status(500).json({ message: 'Server error during search' });
   }
 });
 
