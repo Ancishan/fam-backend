@@ -9,8 +9,7 @@ const app = express();
 
 // Middleware
 const allowedOrigins = [
-  'http://localhost:3000',
-  // 'https://dk-gadget-hub.vercel.app'
+  'https://dk-gadget-hub.vercel.app','http://localhost:3000',
 ];
 
 const corsOptions = {
@@ -41,6 +40,7 @@ const productSchema = new mongoose.Schema({
   model: { type: String, required: true },
   price: { type: Number, required: true },
   discount: { type: Number, default: 0 },
+  stock: { type: Number, default: 0 }, // <-- Updated: Changed 'instock' to 'stock'
   image: { type: String, required: true },
   description: { type: String, required: true },
   category: {
@@ -138,9 +138,10 @@ app.post("/admin", (req, res) => {
 // Create a Product
 app.post('/products', async (req, res) => {
   try {
-    const { name, model, price, description, discount, image, category } = req.body;
+    // <-- New: Included 'stock' in the destructuring
+    const { name, model, price, description, discount, image, category, stock } = req.body;
 
-    if (!name || !model || !price || !description || !image || !category) {
+    if (!name || !model || !price || !description || !image || !category || stock === undefined) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
@@ -152,6 +153,7 @@ app.post('/products', async (req, res) => {
       description,
       image,
       category,
+      stock: parseInt(stock), // <-- New: Added 'stock' field and ensured it's an integer
     });
 
     const savedProduct = await newProduct.save();
@@ -221,7 +223,8 @@ app.get("/products/:id", async (req, res) => {
 // Update a product
 app.put('/api/products/:id', async (req, res) => {
   try {
-    const { name, model, price, discount, description, image, category } = req.body;
+    // <-- New: Included 'stock' in the destructuring
+    const { name, model, price, discount, description, image, category, stock } = req.body;
 
     const updatedFields = {
       name,
@@ -230,7 +233,8 @@ app.put('/api/products/:id', async (req, res) => {
       discount: discount ? parseFloat(discount) : 0,
       description,
       image,
-      category
+      category,
+      stock: stock ? parseInt(stock) : 0, // <-- New: Added 'stock' field
     };
 
     const updatedProduct = await Product.findByIdAndUpdate(
@@ -515,7 +519,7 @@ app.post("/order", async (req, res) => {
       quantity,
       totalPrice,
       buyerName,
-      buyerEmail,    // এটা একদম ঠিক মতো লাগবে
+      buyerEmail,     // এটা একদম ঠিক মতো লাগবে
       phone,
       orderedBy,
       address,
@@ -634,7 +638,50 @@ app.get('/search', async (req, res) => {
   }
 });
 
+// ✅ Get the count of orders by user email
+app.get("/my-orders-count", async (req, res) => {
+  const { email } = req.query;
 
+  try {
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const count = await Order.countDocuments({ buyerEmail: email });
+
+    res.status(200).json({
+      success: true,
+      count,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching order count:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching order count",
+    });
+  }
+});
+
+// DELETE an order by ID
+app.delete("/orders/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const deletedOrder = await Order.findByIdAndDelete(id);
+
+    if (!deletedOrder) {
+      return res.status(404).json({ success: false, message: "Order not found" });
+    }
+
+    res.status(200).json({ success: true, message: "Order deleted successfully" });
+  } catch (err) {
+    console.error("❌ Error deleting order:", err);
+    res.status(500).json({ success: false, message: "Failed to delete order" });
+  }
+});
 
 
 
